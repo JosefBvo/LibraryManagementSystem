@@ -2,22 +2,24 @@ package services;
 
 import models.Book;
 import models.Borrower;
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class LibraryService {
     private List<Book> books;
     private List<Borrower> borrowers;
-    private Map<String, String> borrowedBooks; // Book ID to Borrower ID
 
     public LibraryService() {
-        books = new ArrayList<>();
-        borrowers = new ArrayList<>();
-        borrowedBooks = new HashMap<>();
+        this.books = new ArrayList<>();
+        this.borrowers = new ArrayList<>();
     }
 
     // Book Management
     public boolean addBook(Book book) {
-        if (findBookById(book.getId()) != null) return false;
+        if (books.stream().anyMatch(b -> b.getId().equals(book.getId()))) return false;
         books.add(book);
         return true;
     }
@@ -35,9 +37,13 @@ public class LibraryService {
         return books.removeIf(book -> book.getId().equals(id));
     }
 
+    public List<Book> getAllBooks() { 
+        return new ArrayList<>(books); 
+    }
+
     // Borrower Management
     public boolean registerBorrower(Borrower borrower) {
-        if (findBorrowerById(borrower.getId()) != null) return false;
+        if (borrowers.stream().anyMatch(b -> b.getId().equals(borrower.getId()))) return false;
         borrowers.add(borrower);
         return true;
     }
@@ -54,50 +60,95 @@ public class LibraryService {
         return borrowers.removeIf(b -> b.getId().equals(id));
     }
 
-    // Borrow/Return
+    public List<Borrower> getAllBorrowers() { 
+        return new ArrayList<>(borrowers); 
+    }
+
+    // Borrow & Return
     public boolean borrowBook(String bookId, String borrowerId) {
+        if (findBorrowerById(borrowerId) == null) return false;
         Book book = findBookById(bookId);
-        Borrower borrower = findBorrowerById(borrowerId);
-        if (book == null || borrower == null || !book.isAvailable()) return false;
+        if (book == null || !book.isAvailable()) return false;
         book.borrowBook();
-        borrowedBooks.put(bookId, borrowerId);
         return true;
     }
 
     public boolean returnBook(String bookId) {
         Book book = findBookById(bookId);
-        if (book == null || book.isAvailable() || !borrowedBooks.containsKey(bookId)) return false;
+        if (book == null || book.isAvailable()) return false;
         book.returnBook();
-        borrowedBooks.remove(bookId);
         return true;
     }
 
-    // Search Methods
-    public List<Book> searchBooksByTitle(String title) {
-        return books.stream().filter(b -> b.getTitle().equalsIgnoreCase(title)).toList();
+    // Search & Filter
+    public List<Book> searchBooks(String query) {
+        String q = query.toLowerCase();
+        return books.stream()
+            .filter(b -> b.getTitle().toLowerCase().contains(q) ||
+                         b.getAuthor().toLowerCase().contains(q) ||
+                         b.getGenre().toLowerCase().contains(q))
+            .collect(Collectors.toList());
     }
 
-    public List<Book> searchBooksByAuthor(String author) {
-        return books.stream().filter(b -> b.getAuthor().equalsIgnoreCase(author)).toList();
+    // Sorting Methods
+    public List<Book> sortBooksByTitle() { //Will search and print in Alphabetical Order
+        return books.stream()
+                .sorted(Comparator.comparing(Book::getTitle))
+                .collect(Collectors.toList());
     }
 
-    public List<Book> searchBooksByGenre(String genre) {
-        return books.stream().filter(b -> b.getGenre().equalsIgnoreCase(genre)).toList();
+    public List<Book> sortBooksByAuthor() {
+        return books.stream()
+                .sorted(Comparator.comparing(Book::getAuthor)) //Will sort in Alphabetical order
+                .collect(Collectors.toList());
     }
 
-    public List<Book> filterBooksByAvailability(boolean available) {
-        return books.stream().filter(b -> b.isAvailable() == available).toList();
+    public List<Book> sortBooksByGenre() {
+        return books.stream()
+                .sorted(Comparator.comparing(Book::getGenre))
+                .collect(Collectors.toList());
     }
 
-    // Helper Methods
-    public Book findBookById(String id) {
-        return books.stream().filter(b -> b.getId().equals(id)).findFirst().orElse(null);
+    public List<Book> sortBooksByAvailability() {
+        return books.stream()
+                .sorted(Comparator.comparing(Book::isAvailable).reversed())
+                .collect(Collectors.toList());
     }
 
-    public Borrower findBorrowerById(String id) {
-        return borrowers.stream().filter(b -> b.getId().equals(id)).findFirst().orElse(null);
+    // Filtering Methods
+    public List<Book> filterAvailableBooks() {
+        return books.stream()
+                .filter(Book::isAvailable)
+                .collect(Collectors.toList());
     }
 
-    public List<Book> getBooks() { return books; }
-    public List<Borrower> getBorrowers() { return borrowers; }
+    public List<Book> filterBorrowedBooks() {
+        return books.stream()
+                .filter(book -> !book.isAvailable())
+                .collect(Collectors.toList());
+    }
+
+    // Helper methods
+    private Book findBookById(String id) {
+        return books.stream()
+            .filter(b -> b.getId().equals(id))
+            .findFirst()
+            .orElse(null);
+    }
+
+    private Borrower findBorrowerById(String id) {
+        return borrowers.stream()
+            .filter(b -> b.getId().equals(id))
+            .findFirst()
+            .orElse(null);
+    }
+
+    // Data loading methods
+    public void setBooks(List<Book> books) { 
+        this.books = books; 
+    }
+
+    public void setBorrowers(List<Borrower> borrowers) { 
+        this.borrowers = borrowers; 
+    }
 }
