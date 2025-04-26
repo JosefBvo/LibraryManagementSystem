@@ -4,7 +4,9 @@ import models.Book;
 import models.Borrower;
 import services.FileHandler;
 import services.LibraryService;
+import services.LibraryService.ReturnResult;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Scanner;
 
@@ -29,31 +31,34 @@ public class Main {
                     case 4: returnBook(); break;
                     case 5: searchBooks(); break;
                     case 6: sortAndFilterBooks(); break;
-                    case 7: running = false; break;
-                    default: System.out.println("Invalid choice. Please try again.");
+                    case 7: checkOverdueBooks(); break;
+                    case 8: running = false; break;
+                    default: System.out.println("Invalid choice. Please try again."); //Error handling
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Please enter a number between 1 and 7.");
+                System.out.println("Please enter a number between 1 and 8."); 
             }
         }
 
-        // Save data
+        // Save data into corresponding .txt files
         FileHandler.saveBooks("books.txt", libraryService.getAllBooks());
         FileHandler.saveBorrowers("borrowers.txt", libraryService.getAllBorrowers());
         scanner.close();
-        System.out.println("All data has been saved and the LMS will now exit, goodbye!");
+        System.out.println("Exiting Library Management System. Goodbye!");
     }
 
     private static void printMainMenu() {
-        System.out.println("\nLibrary Management System");
+    	System.out.println("----------------------------------------------------------");//Helps with CLI readability
+        System.out.println("\nWelcome to the Library Management System\n");
         System.out.println("1. Book Management");
         System.out.println("2. Borrower Management");
         System.out.println("3. Borrow a Book");
         System.out.println("4. Return a Book");
         System.out.println("5. Search Books");
         System.out.println("6. Sort & Filter Books");
-        System.out.println("7. Exit");
-        System.out.print("Enter your choice: ");
+        System.out.println("7. Check Overdue Books");
+        System.out.println("8. Exit");
+        System.out.print("\nPlease Select an option: ");
     }
 
     private static void manageBooks() {
@@ -83,8 +88,8 @@ public class Main {
         String id = scanner.nextLine();
         System.out.print("Enter title: ");
         String title = scanner.nextLine();
-        System.out.print("Enter author (Format <last name>, <first name>: "); //this format keeps the search method ...
-        String author = scanner.nextLine();									 //orthodox by ordering author by last name
+        System.out.print("Enter author: ");
+        String author = scanner.nextLine();
         System.out.print("Enter genre: ");
         String genre = scanner.nextLine();
 
@@ -159,7 +164,7 @@ public class Main {
         String id = scanner.nextLine();
         System.out.print("Enter name: ");
         String name = scanner.nextLine();
-        System.out.print("Enter phone number: ");
+        System.out.print("Enter contact details: ");
         String contact = scanner.nextLine();
 
         Borrower borrower = new Borrower(id, name, contact);
@@ -211,7 +216,7 @@ public class Main {
         String borrowerId = scanner.nextLine();
 
         if (libraryService.borrowBook(bookId, borrowerId)) {
-            System.out.println("Book borrowed successfully.");
+            System.out.println("Book borrowed successfully. Due in 2 weeks.");
         } else {
             System.out.println("Failed to borrow book. Check IDs and availability.");
         }
@@ -221,8 +226,13 @@ public class Main {
         System.out.print("Enter book ID to return: ");
         String bookId = scanner.nextLine();
 
-        if (libraryService.returnBook(bookId)) {
-            System.out.println("Book returned successfully.");
+        ReturnResult result = libraryService.returnBook(bookId);
+        if (result.isSuccess()) {
+            if (result.getLateFee() > 0) {
+                System.out.printf("Book returned successfully. Late fee: $%.2f%n", result.getLateFee());
+            } else {
+                System.out.println("Book returned successfully. No late fee.");
+            }
         } else {
             System.out.println("Failed to return book. Check ID and status.");
         }
@@ -282,6 +292,28 @@ public class Main {
                     return;
                 default:
                     System.out.println("Invalid choice.");
+            }
+        }
+    }
+
+    private static void checkOverdueBooks() {
+        List<Book> overdueBooks = libraryService.getOverdueBooks();
+        if (overdueBooks.isEmpty()) {
+            System.out.println("No overdue books found.");
+        } else {
+            System.out.println("\nOverdue Books:");
+            overdueBooks.forEach(book -> {
+                double fee = book.calculateLateFee();
+                System.out.printf("%s (Late fee: $%.2f)%n", book, fee);
+            });
+            
+            System.out.print("\nCheck late fees for a specific borrower? (y/n): ");
+            String choice = scanner.nextLine();
+            if (choice.equalsIgnoreCase("y")) {
+                System.out.print("Enter borrower ID: ");
+                String borrowerId = scanner.nextLine();
+                double totalFees = libraryService.calculateBorrowerLateFees(borrowerId);
+                System.out.printf("Total late fees for borrower %s: $%.2f%n", borrowerId, totalFees);
             }
         }
     }

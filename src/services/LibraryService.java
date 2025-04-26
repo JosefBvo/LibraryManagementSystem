@@ -3,6 +3,7 @@ package services;
 import models.Book;
 import models.Borrower;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -11,6 +12,8 @@ import java.util.stream.Collectors;
 public class LibraryService {
     private List<Book> books;
     private List<Borrower> borrowers;
+    private static final double LATE_FEE_PER_DAY = 0.50;
+    private static final int LOAN_PERIOD_DAYS = 14;
 
     public LibraryService() {
         this.books = new ArrayList<>();
@@ -64,20 +67,27 @@ public class LibraryService {
         return new ArrayList<>(borrowers); 
     }
 
-    // Borrow & Return
+    // Borrow and Return
     public boolean borrowBook(String bookId, String borrowerId) {
-        if (findBorrowerById(borrowerId) == null) return false;
+        Borrower borrower = findBorrowerById(borrowerId);
+        if (borrower == null) return false;
+        
         Book book = findBookById(bookId);
         if (book == null || !book.isAvailable()) return false;
-        book.borrowBook();
+        
+        book.borrowBook(borrowerId);
         return true;
     }
 
-    public boolean returnBook(String bookId) {
+    public ReturnResult returnBook(String bookId) {
         Book book = findBookById(bookId);
-        if (book == null || book.isAvailable()) return false;
+        if (book == null || book.isAvailable()) {
+            return new ReturnResult(false, 0.0);
+        }
+        
+        double lateFee = book.calculateLateFee();
         book.returnBook();
-        return true;
+        return new ReturnResult(true, lateFee);
     }
 
     // Search & Filter
@@ -90,8 +100,8 @@ public class LibraryService {
             .collect(Collectors.toList());
     }
 
-    // Sorting Methods
-    public List<Book> sortBooksByTitle() { //Will search and print in Alphabetical Order
+    // Sorting methods
+    public List<Book> sortBooksByTitle() {
         return books.stream()
                 .sorted(Comparator.comparing(Book::getTitle))
                 .collect(Collectors.toList());
@@ -99,7 +109,7 @@ public class LibraryService {
 
     public List<Book> sortBooksByAuthor() {
         return books.stream()
-                .sorted(Comparator.comparing(Book::getAuthor)) //Will sort in Alphabetical order
+                .sorted(Comparator.comparing(Book::getAuthor))
                 .collect(Collectors.toList());
     }
 
@@ -115,7 +125,7 @@ public class LibraryService {
                 .collect(Collectors.toList());
     }
 
-    // Filtering Methods
+    // Filtering methods
     public List<Book> filterAvailableBooks() {
         return books.stream()
                 .filter(Book::isAvailable)
@@ -126,6 +136,22 @@ public class LibraryService {
         return books.stream()
                 .filter(book -> !book.isAvailable())
                 .collect(Collectors.toList());
+    }
+
+    // Due Date and Late Fee methods
+    public List<Book> getOverdueBooks() {
+        return books.stream()
+                .filter(book -> !book.isAvailable() && 
+                      LocalDate.now().isAfter(book.getDueDate()))
+                .collect(Collectors.toList());
+    }
+
+    public double calculateBorrowerLateFees(String borrowerId) {
+        return books.stream()
+                .filter(book -> !book.isAvailable() && 
+                      borrowerId.equals(book.getBorrowedBy()))
+                .mapToDouble(Book::calculateLateFee)
+                .sum();
     }
 
     // Helper methods
@@ -150,5 +176,19 @@ public class LibraryService {
 
     public void setBorrowers(List<Borrower> borrowers) { 
         this.borrowers = borrowers; 
+    }
+
+    // Return function for late fees
+    public static class ReturnResult {
+        private boolean success;
+        private double lateFee;
+
+        public ReturnResult(boolean success, double lateFee) {
+            this.success = success;
+            this.lateFee = lateFee;
+        }
+
+        public boolean isSuccess() { return success; }
+        public double getLateFee() { return lateFee; }
     }
 }
