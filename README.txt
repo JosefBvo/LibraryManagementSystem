@@ -5,4 +5,4 @@ Features:
 	-Managing borrowers
 	-Basic Library Functions
 	-Searches
-	
+	-Due date and late return fees
